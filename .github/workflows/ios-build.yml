@@ -105,30 +105,44 @@ jobs:
         fi
         
         # 获取可用的iOS模拟器设备和运行时版本
-        echo "Available iOS Simulators:"
+        echo "=== Available iOS Simulators ==="
         xcrun simctl list devices available
+        echo "=== Available iOS Runtimes ==="
+        xcrun simctl list runtimes
         
         # 获取第一个可用的iPhone模拟器及其iOS版本
         SIMULATOR_INFO=$(xcrun simctl list devices available | grep iPhone | head -1)
-        echo "Selected simulator info: $SIMULATOR_INFO"
+        echo "Selected simulator info: '$SIMULATOR_INFO'"
         
         # 提取设备名称（不包含版本号）
         SIMULATOR_DEVICE=$(echo "$SIMULATOR_INFO" | sed 's/.*\(iPhone [0-9]*[^(]*\).*/\1/' | xargs)
+        echo "Extracted device name: '$SIMULATOR_DEVICE'"
         if [ -z "$SIMULATOR_DEVICE" ]; then
           SIMULATOR_DEVICE="iPhone 15"
+          echo "Using fallback device: $SIMULATOR_DEVICE"
         fi
         
         # 提取iOS版本
         IOS_VERSION=$(echo "$SIMULATOR_INFO" | sed 's/.*(\([0-9]*\.[0-9]*\).*/\1/')
+        echo "Extracted iOS version: '$IOS_VERSION'"
         if [ -z "$IOS_VERSION" ]; then
           # 如果无法提取版本，使用SDK版本
           IOS_VERSION=$(echo "$IOS_SDK" | sed 's/iphonesimulator\([0-9]*\.[0-9]*\)/\1/')
-          if [ -z "$IOS_VERSION" ] || [ "$IOS_VERSION" = "$IOS_SDK" ]; then
-            IOS_VERSION="17.0"  # 使用稳定的默认版本
-          fi
-        fi
-        
-        echo "Using device: $SIMULATOR_DEVICE with iOS: $IOS_VERSION"
+          echo "Using SDK-based version: '$IOS_VERSION'"
+           if [ -z "$IOS_VERSION" ] || [ "$IOS_VERSION" = "$IOS_SDK" ]; then
+             IOS_VERSION="17.0"  # 使用稳定的默认版本
+             echo "Using final fallback version: $IOS_VERSION"
+           fi
+         fi
+         
+         # 最终验证和fallback
+         if [ -z "$IOS_VERSION" ] || [ -z "$SIMULATOR_DEVICE" ]; then
+           echo "Failed to detect iOS version or device, using safe defaults"
+           IOS_VERSION="17.0"
+           SIMULATOR_DEVICE="iPhone 15"
+         fi
+         
+         echo "Final configuration - Device: '$SIMULATOR_DEVICE' with iOS: '$IOS_VERSION'"
         
         # 构建应用 - 使用动态检测的iOS版本
         echo "Building with SDK: $IOS_SDK for iOS: $IOS_VERSION"
