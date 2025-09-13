@@ -1,20 +1,111 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>
-      Blank
+      智能翻译器
     </ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <div class="container">
+    <!-- 头部标题 -->
+    <div class="header">
+      <h1>智能翻译器</h1>
+      <p>免费在线翻译工具，支持多种语言互译</p>
+    </div>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
+    <!-- 翻译区域 -->
+    <div class="translator-section">
+      <!-- 输入区域 -->
+      <div class="input-section">
+        <ion-select [(ngModel)]="sourceLanguage" class="language-selector" placeholder="选择源语言">
+          <ion-select-option value="zh-CN">中文（简体）</ion-select-option>
+          <ion-select-option value="zh-TW">中文（繁体）</ion-select-option>
+          <ion-select-option value="en-US">英语</ion-select-option>
+          <ion-select-option value="ja-JP">日语</ion-select-option>
+          <ion-select-option value="ko-KR">韩语</ion-select-option>
+          <ion-select-option value="fr-FR">法语</ion-select-option>
+          <ion-select-option value="de-DE">德语</ion-select-option>
+          <ion-select-option value="es-ES">西班牙语</ion-select-option>
+          <ion-select-option value="it-IT">意大利语</ion-select-option>
+          <ion-select-option value="pt-PT">葡萄牙语</ion-select-option>
+          <ion-select-option value="ru-RU">俄语</ion-select-option>
+          <ion-select-option value="ar-SA">阿拉伯语</ion-select-option>
+          <ion-select-option value="th-TH">泰语</ion-select-option>
+          <ion-select-option value="vi-VN">越南语</ion-select-option>
+        </ion-select>
+        
+        <ion-textarea 
+          [(ngModel)]="sourceText" 
+          (ionInput)="onSourceTextChange()" 
+          class="text-area" 
+          placeholder="请输入要翻译的文本..." 
+          rows="6">
+        </ion-textarea>
+        
+        <div class="char-count">{{getCharCount()}} / 500</div>
+      </div>
+
+      <!-- 交换按钮 -->
+      <ion-button 
+        (click)="swapLanguages()" 
+        class="swap-button" 
+        fill="clear" 
+        shape="round">
+        ⇄
+      </ion-button>
+
+      <!-- 输出区域 -->
+      <div class="output-section">
+        <ion-select [(ngModel)]="targetLanguage" class="language-selector" placeholder="选择目标语言">
+          <ion-select-option value="zh-CN">中文（简体）</ion-select-option>
+          <ion-select-option value="zh-TW">中文（繁体）</ion-select-option>
+          <ion-select-option value="en-US">英语</ion-select-option>
+          <ion-select-option value="ja-JP">日语</ion-select-option>
+          <ion-select-option value="ko-KR">韩语</ion-select-option>
+          <ion-select-option value="fr-FR">法语</ion-select-option>
+          <ion-select-option value="de-DE">德语</ion-select-option>
+          <ion-select-option value="es-ES">西班牙语</ion-select-option>
+          <ion-select-option value="it-IT">意大利语</ion-select-option>
+          <ion-select-option value="pt-PT">葡萄牙语</ion-select-option>
+          <ion-select-option value="ru-RU">俄语</ion-select-option>
+          <ion-select-option value="ar-SA">阿拉伯语</ion-select-option>
+          <ion-select-option value="th-TH">泰语</ion-select-option>
+          <ion-select-option value="vi-VN">越南语</ion-select-option>
+        </ion-select>
+        
+        <ion-textarea 
+          [value]="targetText" 
+          class="text-area output-area" 
+          readonly 
+          rows="6" 
+          placeholder="翻译结果将显示在这里...">
+        </ion-textarea>
+      </div>
+    </div>
+
+    <!-- 翻译按钮 -->
+    <ion-button 
+      (click)="translate()" 
+      [disabled]="isLoading" 
+      expand="block" 
+      class="translate-button">
+      <ion-icon name="rocket" slot="start"></ion-icon>
+      {{isLoading ? '翻译中...' : '开始翻译'}}
+    </ion-button>
+
+    <!-- 加载指示器 -->
+    <div *ngIf="isLoading" class="loading">
+      <ion-spinner></ion-spinner>
+      <p>正在翻译，请稍候...</p>
+    </div>
+
+    <!-- 错误信息 -->
+    <ion-card *ngIf="errorMessage" class="error-message">
+      <ion-card-content>
+        <ion-icon name="alert-circle" color="danger"></ion-icon>
+        {{errorMessage}}
+      </ion-card-content>
+    </ion-card>
   </div>
 </ion-content>
