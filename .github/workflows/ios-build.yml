@@ -11,7 +11,7 @@ on:
 jobs:
   build-ios:
     name: Build iOS App
-    runs-on: macos-latest
+    runs-on: macos-13  # 使用macOS 13以获得更稳定的Xcode版本
     
     steps:
     # 检出代码
@@ -54,6 +54,14 @@ jobs:
         cd ios/App
         pod install
     
+    # 设置临时keychain（避免签名相关错误）
+    - name: Setup Keychain
+      run: |
+        security create-keychain -p "" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "" build.keychain
+        security set-keychain-settings -t 3600 -u build.keychain
+    
     # 构建iOS应用（无签名版本用于测试）
     - name: Build iOS App (Debug)
       run: |
@@ -61,8 +69,8 @@ jobs:
         xcodebuild -workspace App.xcworkspace \
                    -scheme App \
                    -configuration Debug \
-                   -destination 'platform=iOS Simulator,name=iPhone 15' \
-                   -sdk iphonesimulator \
+                   -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.0' \
+                   -sdk iphonesimulator17.0 \
                    build
     
     # 上传构建产物
