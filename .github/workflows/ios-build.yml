@@ -76,17 +76,41 @@ jobs:
         export CODE_SIGNING_ALLOWED=NO
         
         # 获取可用的iOS模拟器SDK版本
+        echo "Available SDKs:"
+        xcodebuild -showsdks | grep iphonesimulator
+        
+        # 尝试多种方式获取SDK版本
         IOS_SDK=$(xcodebuild -showsdks | grep iphonesimulator | tail -1 | awk '{print $NF}')
-        echo "Using iOS SDK: $IOS_SDK"
+        echo "Detected iOS SDK: $IOS_SDK"
+        
+        # 验证SDK是否有效，如果无效则尝试其他方式
+        if [ -z "$IOS_SDK" ] || ! xcodebuild -showsdks | grep -q "$IOS_SDK"; then
+          # 尝试获取默认的模拟器SDK
+          IOS_SDK=$(xcrun --sdk iphonesimulator --show-sdk-name 2>/dev/null || echo "iphonesimulator")
+          echo "Using fallback SDK: $IOS_SDK"
+        fi
+        
+        # 最后的保险措施
+        if [ -z "$IOS_SDK" ]; then
+          IOS_SDK="iphonesimulator"
+          echo "Using final fallback SDK: $IOS_SDK"
+        fi
         
         # 获取可用的iOS模拟器设备
-        SIMULATOR_DEVICE=$(xcrun simctl list devices available | grep iPhone | head -1 | sed 's/.*iPhone \([0-9]*\).*/iPhone \1/')
+        echo "Available iOS Simulators:"
+        xcrun simctl list devices available | grep iPhone
+        
+        SIMULATOR_DEVICE=$(xcrun simctl list devices available | grep iPhone | head -1 | sed 's/.*\(iPhone [^(]*\).*/\1/' | xargs)
         if [ -z "$SIMULATOR_DEVICE" ]; then
           SIMULATOR_DEVICE="iPhone 15"
+          echo "No available simulators found, using default: $SIMULATOR_DEVICE"
+        else
+          echo "Selected simulator device: $SIMULATOR_DEVICE"
         fi
-        echo "Using simulator device: $SIMULATOR_DEVICE"
         
         # 构建应用
+        echo "Building with SDK: $IOS_SDK and Device: $SIMULATOR_DEVICE"
+        
         xcodebuild -workspace App.xcworkspace \
                    -scheme App \
                    -configuration Debug \
@@ -94,8 +118,10 @@ jobs:
                    -sdk "$IOS_SDK" \
                    CODE_SIGNING_REQUIRED=NO \
                    CODE_SIGNING_ALLOWED=NO \
+                   PROVISIONING_PROFILE= \
+                   CODE_SIGN_IDENTITY= \
                    -allowProvisioningUpdates \
-                   build
+                   clean build
     
     # 上传构建产物
     - name: Upload Build Artifacts
