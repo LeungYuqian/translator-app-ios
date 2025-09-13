@@ -62,6 +62,7 @@ jobs:
                    -scheme App \
                    -configuration Debug \
                    -destination 'generic/platform=iOS Simulator' \
+                   -sdk iphonesimulator \
                    -archivePath $PWD/build/App.xcarchive \
                    archive
     
