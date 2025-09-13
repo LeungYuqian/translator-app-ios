@@ -67,6 +67,14 @@ jobs:
         security unlock-keychain -p "" build.keychain
         security set-keychain-settings -t 3600 -u build.keychain
     
+    # 安装iOS 16.4模拟器运行时
+    - name: Install iOS 16.4 Simulator runtime
+      run: |
+        echo "Installing iOS 16.4 Simulator runtime..."
+        xcrun simctl runtime add download com.apple.CoreSimulator.SimRuntime.iOS-16-4
+        echo "Available runtimes after installation:"
+        xcrun simctl list runtimes
+
     # 构建iOS应用（无签名版本用于测试）
     - name: Build iOS App (Debug)
       run: |
@@ -122,13 +130,13 @@ jobs:
         
         echo "Using device: $SIMULATOR_DEVICE with iOS: $IOS_VERSION"
         
-        # 构建应用 - 使用generic/platform避免特定设备问题
-        echo "Building with SDK: $IOS_SDK"
+        # 构建应用 - 使用iOS 16.4目标版本
+        echo "Building with SDK: $IOS_SDK for iOS 16.4"
         
         xcodebuild -workspace App.xcworkspace \
                    -scheme App \
                    -configuration Debug \
-                   -destination "generic/platform=iOS Simulator" \
+                   -destination "platform=iOS Simulator,name=iPhone 14,OS=16.4" \
                    -sdk "$IOS_SDK" \
                    CODE_SIGNING_REQUIRED=NO \
                    CODE_SIGNING_ALLOWED=NO \
