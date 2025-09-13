@@ -61,17 +61,16 @@ jobs:
         xcodebuild -workspace App.xcworkspace \
                    -scheme App \
                    -configuration Debug \
-                   -destination 'generic/platform=iOS Simulator' \
+                   -destination 'platform=iOS Simulator,name=iPhone 15' \
                    -sdk iphonesimulator \
-                   -archivePath $PWD/build/App.xcarchive \
-                   archive
+                   build
     
     # 上传构建产物
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ios-build-debug
-        path: ios/App/build/
+        path: ios/App/build/Debug-iphonesimulator/
         retention-days: 30
 
   # 发布版本构建（需要证书和配置文件）
