@@ -14,11 +14,15 @@
 ### 方法1：使用自动化脚本（推荐）
 
 ```bash
-# 运行自动化设置脚本
+# 步骤1：初始化Git并提交代码（已完成）
 npm run setup:github
-```
 
-然后按照脚本提示完成GitHub仓库设置。
+# 步骤2：创建GitHub仓库
+# 按照 CREATE-GITHUB-REPO.md 指南创建仓库
+
+# 步骤3：设置远程仓库并推送
+npm run setup:remote https://github.com/你的用户名/translator-app-ios.git
+```
 
 ### 方法2：手动设置
 

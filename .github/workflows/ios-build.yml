@@ -35,7 +35,7 @@ jobs:
     # 构建Web应用
     - name: Build Web App
       run: |
-        ionic build --prod
+        npm run build
     
     # 同步到iOS平台
     - name: Sync iOS Platform
@@ -101,7 +101,7 @@ jobs:
     # 构建Web应用
     - name: Build Web App
       run: |
-        ionic build --prod
+        npm run build
     
     # 同步到iOS平台
     - name: Sync iOS Platform

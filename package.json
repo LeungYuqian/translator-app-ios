@@ -17,7 +17,8 @@
     "cap:open:ios": "npx cap open ios",
     "cap:run:ios": "npx cap run ios",
     "build:ios": "npm run ionic:build && npm run cap:sync:ios",
-    "setup:github": "setup-github.bat"
+    "setup:github": "setup-github.bat",
+    "setup:remote": "setup-remote.bat"
   },
   "private": true,
   "dependencies": {
