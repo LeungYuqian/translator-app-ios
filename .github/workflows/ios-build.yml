@@ -83,114 +83,126 @@ jobs:
         export CODE_SIGNING_REQUIRED=NO
         export CODE_SIGNING_ALLOWED=NO
         
-        # 获取可用的iOS模拟器SDK版本
+        echo "=== iOS Build Environment Analysis ==="
+        
+        # 1. 获取可用的SDK
         echo "Available SDKs:"
         xcodebuild -showsdks | grep iphonesimulator
-        
-        # 尝试多种方式获取SDK版本
         IOS_SDK=$(xcodebuild -showsdks | grep iphonesimulator | tail -1 | awk '{print $NF}')
-        echo "Detected iOS SDK: $IOS_SDK"
+        echo "Selected SDK: $IOS_SDK"
         
-        # 验证SDK是否有效，如果无效则尝试其他方式
-        if [ -z "$IOS_SDK" ] || ! xcodebuild -showsdks | grep -q "$IOS_SDK"; then
-          # 尝试获取默认的模拟器SDK
-          IOS_SDK=$(xcrun --sdk iphonesimulator --show-sdk-name 2>/dev/null || echo "iphonesimulator")
-          echo "Using fallback SDK: $IOS_SDK"
+        # 2. 使用xcodebuild -showdestinations获取真实可用的destinations
+        echo "\n=== Getting Available Destinations ==="
+        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -workspace App.xcworkspace -scheme App 2>/dev/null || echo "")
+        
+        if [ -z "$DESTINATIONS_OUTPUT" ]; then
+          echo "Warning: Could not get destinations from workspace, trying project file..."
+          # 尝试查找.xcodeproj文件
+          XCODEPROJ=$(find . -name "*.xcodeproj" | head -1)
+          if [ -n "$XCODEPROJ" ]; then
+            DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -project "$XCODEPROJ" -scheme App 2>/dev/null || echo "")
+          fi
         fi
         
-        # 最后的保险措施
-        if [ -z "$IOS_SDK" ]; then
-          IOS_SDK="iphonesimulator"
-          echo "Using final fallback SDK: $IOS_SDK"
+        echo "Raw destinations output:"
+        echo "$DESTINATIONS_OUTPUT"
+        
+        # 3. 解析可用的iOS模拟器destinations
+        VALID_DESTINATIONS=$(echo "$DESTINATIONS_OUTPUT" | grep "platform:iOS Simulator" | grep -v "Unavailable" || echo "")
+        echo "\n=== Valid iOS Simulator Destinations ==="
+        echo "$VALID_DESTINATIONS"
+        
+        # 4. 选择最佳destination
+        SELECTED_DESTINATION=""
+        
+        if [ -n "$VALID_DESTINATIONS" ]; then
+          # 优先选择iPhone 15或iPhone 14
+          PREFERRED_DESTINATION=$(echo "$VALID_DESTINATIONS" | grep -E "iPhone (15|14)" | head -1 || echo "")
+          
+          if [ -n "$PREFERRED_DESTINATION" ]; then
+            SELECTED_DESTINATION="$PREFERRED_DESTINATION"
+            echo "Selected preferred destination: $SELECTED_DESTINATION"
+          else
+            # 选择第一个可用的iPhone
+            IPHONE_DESTINATION=$(echo "$VALID_DESTINATIONS" | grep "iPhone" | head -1 || echo "")
+            if [ -n "$IPHONE_DESTINATION" ]; then
+              SELECTED_DESTINATION="$IPHONE_DESTINATION"
+              echo "Selected iPhone destination: $SELECTED_DESTINATION"
+            else
+              # 选择任何可用的iOS模拟器
+              SELECTED_DESTINATION=$(echo "$VALID_DESTINATIONS" | head -1)
+              echo "Selected first available destination: $SELECTED_DESTINATION"
+            fi
+          fi
         fi
         
-        # 获取可用的iOS模拟器设备和运行时版本
-        echo "=== Available iOS Simulators ==="
-        xcrun simctl list devices available
-        echo "=== Available iOS Runtimes ==="
-        xcrun simctl list runtimes
-        
-        # 获取第一个可用的iPhone模拟器及其iOS版本
-        SIMULATOR_INFO=$(xcrun simctl list devices available | grep iPhone | head -1)
-        echo "Selected simulator info: '$SIMULATOR_INFO'"
-        
-        # 提取设备名称（不包含版本号）
-        SIMULATOR_DEVICE=$(echo "$SIMULATOR_INFO" | sed 's/.*\(iPhone [0-9]*[^(]*\).*/\1/' | xargs)
-        echo "Extracted device name: '$SIMULATOR_DEVICE'"
-        if [ -z "$SIMULATOR_DEVICE" ]; then
-          SIMULATOR_DEVICE="iPhone 15"
-          echo "Using fallback device: $SIMULATOR_DEVICE"
+        # 5. 构建destination参数
+        if [ -n "$SELECTED_DESTINATION" ]; then
+          # 从destination输出中提取参数
+          DEVICE_NAME=$(echo "$SELECTED_DESTINATION" | sed -n 's/.*name:\([^,]*\).*/\1/p' | xargs)
+          OS_VERSION=$(echo "$SELECTED_DESTINATION" | sed -n 's/.*OS:\([^,]*\).*/\1/p' | xargs)
+          
+          if [ -n "$DEVICE_NAME" ] && [ -n "$OS_VERSION" ]; then
+            DESTINATION="platform=iOS Simulator,name=$DEVICE_NAME,OS=$OS_VERSION"
+            echo "Constructed destination: $DESTINATION"
+          else
+            echo "Warning: Could not parse device name or OS version, using generic destination"
+            DESTINATION="generic/platform=iOS Simulator"
+          fi
+        else
+          echo "Warning: No valid destinations found, using generic destination"
+          DESTINATION="generic/platform=iOS Simulator"
         fi
         
-        # 提取iOS版本
-        IOS_VERSION=$(echo "$SIMULATOR_INFO" | sed 's/.*(\([0-9]*\.[0-9]*\).*/\1/')
-        echo "Extracted iOS version: '$IOS_VERSION'"
-        if [ -z "$IOS_VERSION" ]; then
-          # 如果无法提取版本，使用SDK版本
-          IOS_VERSION=$(echo "$IOS_SDK" | sed 's/iphonesimulator\([0-9]*\.[0-9]*\)/\1/')
-          echo "Using SDK-based version: '$IOS_VERSION'"
-           if [ -z "$IOS_VERSION" ] || [ "$IOS_VERSION" = "$IOS_SDK" ]; then
-             IOS_VERSION="17.0"  # 使用稳定的默认版本
-             echo "Using final fallback version: $IOS_VERSION"
-           fi
-         fi
-         
-         # 最终验证和fallback
-         if [ -z "$IOS_VERSION" ] || [ -z "$SIMULATOR_DEVICE" ]; then
-           echo "Failed to detect iOS version or device, using safe defaults"
-           IOS_VERSION="17.0"
-           SIMULATOR_DEVICE="iPhone 15"
-         fi
-         
-         # 检查iOS版本是否合理（避免26.0这样的错误版本）
-         if [[ "$IOS_VERSION" =~ ^[0-9]+\.[0-9]+$ ]] && [ "${IOS_VERSION%%.*}" -gt 20 ]; then
-           echo "Detected unrealistic iOS version: $IOS_VERSION, using fallback"
-           IOS_VERSION="17.0"
-         fi
-         
-         echo "Final configuration - Device: '$SIMULATOR_DEVICE' with iOS: '$IOS_VERSION'"
+        # 6. 最终验证和fallback策略
+        echo "\n=== Final Build Configuration ==="
+        echo "SDK: $IOS_SDK"
+        echo "Destination: $DESTINATION"
         
-        # 验证变量设置
-        echo "=== Build Configuration Verification ==="
-        echo "SIMULATOR_DEVICE: '$SIMULATOR_DEVICE'"
-        echo "IOS_VERSION: '$IOS_VERSION'"
-        echo "IOS_SDK: '$IOS_SDK'"
+        # 7. 执行构建
+        echo "\n=== Starting Build ==="
         
-        # 构建destination字符串
-        DESTINATION="platform=iOS Simulator,name=$SIMULATOR_DEVICE,OS=$IOS_VERSION"
-        echo "Destination: '$DESTINATION'"
+        # 首先尝试使用检测到的destination
+        BUILD_SUCCESS=false
         
-        # 验证destination是否有效
-         echo "=== Validating Destination ==="
-         if xcodebuild -showdestinations -workspace App.xcworkspace -scheme App | grep -q "$SIMULATOR_DEVICE"; then
-           echo "Device '$SIMULATOR_DEVICE' found in available destinations"
-           USE_GENERIC=false
-         else
-           echo "Warning: Device '$SIMULATOR_DEVICE' not found, will use generic destination"
-           USE_GENERIC=true
-         fi
-         
-         # 构建应用 - 使用动态检测的iOS版本或generic fallback
-         echo "=== Starting Build ==="
-         if [ "$USE_GENERIC" = "true" ]; then
-           echo "Using generic destination for maximum compatibility"
-           DESTINATION="generic/platform=iOS Simulator"
-         fi
-         echo "Final destination: '$DESTINATION'"
-         echo "Building with SDK: $IOS_SDK"
-         
-         xcodebuild -workspace App.xcworkspace \
-                    -scheme App \
-                    -configuration Debug \
-                    -destination "$DESTINATION" \
-                    -sdk "$IOS_SDK" \
-                    CODE_SIGNING_REQUIRED=NO \
-                    CODE_SIGNING_ALLOWED=NO \
-                    PROVISIONING_PROFILE= \
-                    CODE_SIGN_IDENTITY= \
-                    DEVELOPMENT_TEAM= \
-                    -allowProvisioningUpdates \
-                    clean build
+        if [ "$DESTINATION" != "generic/platform=iOS Simulator" ]; then
+          echo "Attempting build with specific destination..."
+          if xcodebuild -workspace App.xcworkspace \
+                        -scheme App \
+                        -configuration Debug \
+                        -destination "$DESTINATION" \
+                        -sdk "$IOS_SDK" \
+                        CODE_SIGNING_REQUIRED=NO \
+                        CODE_SIGNING_ALLOWED=NO \
+                        PROVISIONING_PROFILE= \
+                        CODE_SIGN_IDENTITY= \
+                        DEVELOPMENT_TEAM= \
+                        -allowProvisioningUpdates \
+                        clean build; then
+            BUILD_SUCCESS=true
+            echo "✅ Build succeeded with specific destination"
+          else
+            echo "❌ Build failed with specific destination, trying fallback..."
+          fi
+        fi
+        
+        # 如果特定destination失败，使用generic fallback
+        if [ "$BUILD_SUCCESS" = "false" ]; then
+          echo "Using generic destination fallback..."
+          xcodebuild -workspace App.xcworkspace \
+                     -scheme App \
+                     -configuration Debug \
+                     -destination "generic/platform=iOS Simulator" \
+                     -sdk "$IOS_SDK" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO \
+                     PROVISIONING_PROFILE= \
+                     CODE_SIGN_IDENTITY= \
+                     DEVELOPMENT_TEAM= \
+                     -allowProvisioningUpdates \
+                     clean build
+          echo "✅ Build completed with generic destination"
+        fi
     
     # 上传构建产物
     - name: Upload Build Artifacts
